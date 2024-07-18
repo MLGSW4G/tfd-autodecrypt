@@ -5,20 +5,20 @@ import cv2
 from time import sleep
 from pydirectinput import click
 
+REGION_LMB = {'top': 434, 'left': 946, 'width': 13, 'height': 20}
+REGION_RMB = {'top': 434, 'left': 960, 'width': 13, 'height': 20}
+REGION_CIRCLE = {'top': 378, 'left': 885, 'width': 150, 'height': 150}
 COLOR_LOWER = np.array([80, 200, 200])
 COLOR_UPPER = np.array([100, 255, 255])
-BOX_LMB = {'top': 434, 'left': 946, 'width': 13, 'height': 20}       # region of the screen with the LMB icon
-BOX_RMB = {'top': 434, 'left': 960, 'width': 13, 'height': 20}       # region of the screen with the RMB icon
-BOX_CIRCLE = {'top': 378, 'left': 885, 'width': 150, 'height': 150}  # region of the screen containing the whole circle
 
 
-def take_img(box: dict):
+def capture_region(box: dict) -> np.ndarray:
     sct = mss.mss()
     sct_img = sct.grab(box)
-    return sct_img
+    return np.array(sct_img)
 
 
-def check_img(img: np.ndarray):
+def contains_color(img: np.ndarray) -> bool:
     hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
     mask = cv2.inRange(hsv, COLOR_LOWER, COLOR_UPPER)
     if cv2.countNonZero(mask) > 0:
@@ -26,17 +26,16 @@ def check_img(img: np.ndarray):
     return False
 
 
-def get_mouse_button():
-    if check_img(np.array(take_img(BOX_LMB))):
+def get_mouse_button() -> str | None:
+    if contains_color(capture_region(REGION_LMB)):
         return 'left'
     else:
-        if check_img(np.array(take_img(BOX_RMB))):
+        if contains_color(capture_region(REGION_RMB)):
             return 'right'
-    return None
 
 
-def take_circle_img():
-    img = np.array(take_img(BOX_CIRCLE))
+def capture_circle_region() -> np.ndarray:
+    img = capture_region(REGION_CIRCLE)
 
     # Define the center and radius of the circular region
     center_x, center_y = 75, 75
@@ -58,7 +57,7 @@ def take_circle_img():
     return cropped_img
 
 
-def check_line(img: np.array):
+def line_in_sector(img: np.array) -> bool:
     hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
     mask = cv2.inRange(hsv, COLOR_LOWER, COLOR_UPPER)
 
@@ -75,7 +74,7 @@ if __name__ == "__main__":
     while True:
         button = get_mouse_button()
 
-        if button and check_line(take_circle_img()):
+        if button and line_in_sector(capture_circle_region()):
             click(button=button)
             print(f'clicked {button}')
             sleep(0.1)
