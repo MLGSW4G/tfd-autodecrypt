@@ -1,0 +1,2 @@
+resolution = "1920x1080"
+aspect_ratio = "16:9" # only 16:9 and 21:9 are currently supported

@@ -1,13 +1,86 @@
 import mss
-import mss.tools
 import numpy as np
 import cv2
 from time import sleep
 from pydirectinput import click
+import tomllib
 
-REGION_LMB = {'top': 434, 'left': 946, 'width': 13, 'height': 20}
-REGION_RMB = {'top': 434, 'left': 960, 'width': 13, 'height': 20}
-REGION_CIRCLE = {'top': 378, 'left': 885, 'width': 150, 'height': 150}
+with open("config.toml", "r") as file:
+    file = tomllib.loads(file.read())
+
+    WIDTH, HEIGHT = file['resolution'].split('x')
+    WIDTH, HEIGHT = int(WIDTH), int(HEIGHT)
+
+    ASPECT_RATIO = file['aspect_ratio']
+
+
+# 1920x1080
+# REGION_LMB = {'top': 434, 'left': 946, 'width': 13, 'height': 20}
+# REGION_RMB = {'top': 434, 'left': 960, 'width': 13, 'height': 20}
+# REGION_CIRCLE = {'top': 378, 'left': 885, 'width': 150, 'height': 150}
+
+# 2560x1080
+# REGION_LMB = {'top': 435, 'left': 1266, 'width': 13, 'height': 20}
+# REGION_RMB = {'top': 435, 'left': 1281, 'width': 13, 'height': 20}
+# REGION_CIRCLE = {'top': 378, 'left': 1205, 'width': 150, 'height': 150}
+
+if ASPECT_RATIO == "16:9":
+    REGION_RELATIVE_LMB = {'top': 0.40185185185185185,
+                           'left': 0.49270833333333336,
+                           'width': 0.0067708333333333336,
+                           'height': 0.010416666666666666}
+    REGION_RELATIVE_RMB = {'top': 0.40185185185185185,
+                           'left': 0.50000000000000000,
+                           'width': 0.0067708333333333336,
+                           'height': 0.010416666666666666}
+    REGION_RELATIVE_CIRCLE = {'top': 0.35,
+                              'left': 0.4609375,
+                              'width': 0.078125,
+                              'height': 0.1388888888888889}
+
+    # Define the center and radius of the circular region
+    CENTER_X, CENTER_Y = 75, 75
+    OUTER_RADIUS = 70
+    INNER_RADIUS = 42
+elif ASPECT_RATIO == "21:9":
+    REGION_RELATIVE_LMB = {'top': 0.4027777777777778,
+                           'left': 0.49453125,
+                           'width': 0.005078125,
+                           'height': 0.0078125}
+    REGION_RELATIVE_RMB = {'top': 0.4027777777777778,
+                           'left': 0.500390625,
+                           'width': 0.005078125,
+                           'height': 0.0078125}
+    REGION_RELATIVE_CIRCLE = {'top': 0.35,
+                              'left': 0.470703125,
+                              'width': 0.05859375,
+                              'height': 0.1388888888888889}
+
+    # Define the center and radius of the circular region
+    CENTER_X, CENTER_Y = 75, 75
+    OUTER_RADIUS = 70
+    INNER_RADIUS = 48
+else:
+    raise ValueError(f"Unsupported aspect ratio: {ASPECT_RATIO}")
+
+REGION_LMB = {'top': REGION_RELATIVE_LMB['top'] * HEIGHT,
+              'left': REGION_RELATIVE_LMB['left'] * WIDTH,
+              'width': REGION_RELATIVE_LMB['width'] * WIDTH,
+              'height': REGION_RELATIVE_LMB['height'] * WIDTH}
+REGION_RMB = {'top': REGION_RELATIVE_RMB['top'] * HEIGHT,
+              'left': REGION_RELATIVE_RMB['left'] * WIDTH,
+              'width': REGION_RELATIVE_RMB['width'] * WIDTH,
+              'height': REGION_RELATIVE_RMB['height'] * WIDTH}
+REGION_CIRCLE = {'top': REGION_RELATIVE_CIRCLE['top'] * HEIGHT,
+                 'left': REGION_RELATIVE_CIRCLE['left'] * WIDTH,
+                 'width': REGION_RELATIVE_CIRCLE['width'] * WIDTH,
+                 'height': REGION_RELATIVE_CIRCLE['height'] * HEIGHT}
+
+# Convert from float to int
+REGION_LMB = {k: int(v) if isinstance(v, float) else v for k, v in REGION_LMB.items()}
+REGION_RMB = {k: int(v) if isinstance(v, float) else v for k, v in REGION_RMB.items()}
+REGION_CIRCLE = {k: int(v) if isinstance(v, float) else v for k, v in REGION_CIRCLE.items()}
+
 COLOR_LOWER = np.array([80, 200, 200])
 COLOR_UPPER = np.array([100, 255, 255])
 
@@ -29,23 +102,18 @@ def contains_color(img: np.ndarray) -> bool:
 def get_mouse_button() -> str | None:
     if contains_color(capture_region(REGION_LMB)):
         return 'left'
-    else:
-        if contains_color(capture_region(REGION_RMB)):
-            return 'right'
+    elif contains_color(capture_region(REGION_RMB)):
+        return 'right'
 
 
 def capture_circle_region() -> np.ndarray:
     img = capture_region(REGION_CIRCLE)
 
-    # Define the center and radius of the circular region
-    center_x, center_y = 75, 75
-    outer_radius = 70
-    inner_radius = 42
-
     # Create a mask image with a circular region
     mask = np.zeros(img.shape[:2], dtype=np.uint8)
-    cv2.circle(mask, (center_x, center_y), outer_radius, 255, -1)
-    cv2.circle(mask, (center_x, center_y), inner_radius, 0, -1)
+
+    cv2.circle(mask, (CENTER_X, CENTER_Y), OUTER_RADIUS, 255, -1)
+    cv2.circle(mask, (CENTER_X, CENTER_Y), INNER_RADIUS, 0, -1)
 
     # Apply the mask to the original image
     cropped_img = cv2.bitwise_and(img, img, mask=mask)
@@ -71,6 +139,7 @@ def line_in_sector(img: np.array) -> bool:
 
 
 if __name__ == "__main__":
+    print(f"Starting with {WIDTH}x{HEIGHT} resolution, {ASPECT_RATIO} aspect ratio...")
     while True:
         button = get_mouse_button()
 
@@ -78,3 +147,4 @@ if __name__ == "__main__":
             click(button=button)
             print(f'clicked {button}')
             sleep(0.1)
+
